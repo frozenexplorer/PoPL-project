@@ -57,7 +57,7 @@ java -cp bin com.sysops.SysOpsApp
 | `size_gt <bytes>` | List files larger than the specified size. |
 | `size_lt <bytes>` | List files smaller than the specified size. |
 | `sort <name\|size>` | Sort the current view by name or size. |
-| `analyse [path]` | Show detailed statistics (Counts, Avg Size, Max Size) for current or target directory. |
+| `analyse <path>` | Show detailed statistics (Counts, Avg Size, Max Size) for current or target directory. |
 | `history` | Show the last 10 commands. |
 | `exit` | Exit the application. |
 

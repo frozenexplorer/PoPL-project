@@ -1,6 +1,6 @@
-analyse
-analyse documents
-cd documents
-analyse
+ls
 back
+ls
+back
+ls
 exit

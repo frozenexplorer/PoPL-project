@@ -1,6 +1,7 @@
 package com.sysops;
 
 import com.containers.*;
+import java.io.File;
 import java.util.Scanner;
 import java.util.Date;
 import java.util.Comparator;
@@ -9,16 +10,11 @@ public class SysOpsApp {
     // 1. Heterogeneous List: Stores current view
     private static GenericList<FileSystemItem> currentDirectoryItems = new GenericList<>();
 
-    // 2. Stack: Navigation History (Stores the LIST of items of the parent
-    // directory)
-    // Actually, to support "real" navigation, we should store the DirectoryItem
-    // itself
-    // so we can go back to its parent? Or just store the previous list?
-    // Let's store the previous list for simplicity in restoring the view.
-    private static Stack<GenericList<FileSystemItem>> navigationStack = new Stack<>();
+    // 2. Stack: Navigation History (Stores the previous File directory)
+    private static Stack<File> navigationStack = new Stack<>();
 
-    // Track current path name for display
-    private static Stack<String> pathStack = new Stack<>();
+    // Track current real directory
+    private static File currentDir;
 
     // 3. Deque: Command History
     private static Deque<String> commandHistory = new Deque<>();
@@ -32,12 +28,12 @@ public class SysOpsApp {
         System.out.println("Welcome to SysOps CLI v2.0");
         System.out.println("Type 'help' for commands.");
 
-        // Initialize with nested data
-        loadDummyData();
-        pathStack.push("/");
+        // Initialize with real current directory
+        currentDir = new File(System.getProperty("user.dir"));
+        loadDirectory(currentDir);
 
         while (true) {
-            System.out.print("\n" + getPathString() + "> ");
+            System.out.print("\n" + currentDir.getAbsolutePath() + "> ");
             String input = scanner.nextLine().trim();
             if (input.isEmpty())
                 continue;
@@ -113,41 +109,31 @@ public class SysOpsApp {
         }
     }
 
-    private static String getPathString() {
-        // Reconstruct path from stack (this is a bit hacky with Stack but works for
-        // display)
-        // Since our Stack is LIFO, we can't easily iterate bottom-up without popping.
-        // For simplicity, we'll just show the top.
-        if (pathStack.isEmpty())
-            return "/";
-        return pathStack.peek();
+    private static void loadDirectory(File dir) {
+        currentDirectoryItems = new GenericList<>();
+        File[] files = dir.listFiles();
+
+        if (files != null) {
+            for (File f : files) {
+                if (f.isDirectory()) {
+                    // For directories, we don't know the size or children count without recursion,
+                    // so we'll just store 0/empty for now to keep it fast.
+                    currentDirectoryItems.add(new DirectoryItem(f.getName(), 0, new Date(f.lastModified())));
+                } else {
+                    currentDirectoryItems.add(new FileItem(f.getName(), f.length(), new Date(f.lastModified()),
+                            getExtension(f.getName())));
+                }
+            }
+        }
+        refreshLargestFiles();
     }
 
-    private static void loadDummyData() {
-        currentDirectoryItems = new GenericList<>();
-        largestFiles = new PriorityQueueCustom<>((f1, f2) -> Long.compare(f2.getSize(), f1.getSize()));
-
-        // Root items
-        FileItem f1 = new FileItem("report.pdf", 10240, new Date(), "pdf");
-        FileItem f2 = new FileItem("image.png", 5120, new Date(), "png");
-
-        DirectoryItem d1 = new DirectoryItem("documents", 0, new Date());
-        DirectoryItem d2 = new DirectoryItem("photos", 0, new Date());
-
-        // Populate documents
-        d1.addChild(new FileItem("resume.docx", 2048, new Date(), "docx"));
-        d1.addChild(new FileItem("budget.xlsx", 4096, new Date(), "xlsx"));
-
-        // Populate photos
-        d2.addChild(new FileItem("vacation.jpg", 200000, new Date(), "jpg"));
-        d2.addChild(new FileItem("profile.jpg", 50000, new Date(), "jpg"));
-
-        currentDirectoryItems.add(f1);
-        currentDirectoryItems.add(f2);
-        currentDirectoryItems.add(d1);
-        currentDirectoryItems.add(d2);
-
-        refreshLargestFiles();
+    private static String getExtension(String name) {
+        int i = name.lastIndexOf('.');
+        if (i > 0) {
+            return name.substring(i + 1);
+        }
+        return "";
     }
 
     private static void refreshLargestFiles() {
@@ -160,16 +146,21 @@ public class SysOpsApp {
 
     // Functional-OO: Using Streams (lambdas) for display
     private static void listItems() {
-        System.out.println("Listing contents:");
+        System.out.println("Listing contents of " + currentDir.getName() + ":");
         currentDirectoryItems.stream()
                 .forEach(System.out::println);
     }
 
     private static void findItems(String query) {
         System.out.println("Searching for '" + query + "':");
-        currentDirectoryItems.stream()
+        long count = currentDirectoryItems.stream()
                 .filter(item -> item.getName().contains(query))
-                .forEach(System.out::println);
+                .peek(System.out::println) // Print matches as they are found
+                .count();
+
+        if (count == 0) {
+            System.out.println("Not found.");
+        }
     }
 
     private static void filterBySize(String sizeStr, boolean greaterThan) {
@@ -199,23 +190,11 @@ public class SysOpsApp {
     }
 
     private static void changeDirectory(String dirName) {
-        // Find directory using functional stream filter
-        FileSystemItem found = currentDirectoryItems.stream()
-                .filter(item -> item instanceof DirectoryItem && item.getName().equals(dirName))
-                .findFirst()
-                .orElse(null);
-
-        if (found != null) {
-            DirectoryItem dir = (DirectoryItem) found;
-
-            // Save current state
-            navigationStack.push(currentDirectoryItems);
-            pathStack.push(dirName);
-
-            // Switch to new state
-            currentDirectoryItems = dir.getChildren();
-            refreshLargestFiles();
-
+        File target = new File(currentDir, dirName);
+        if (target.exists() && target.isDirectory()) {
+            navigationStack.push(currentDir);
+            currentDir = target;
+            loadDirectory(currentDir);
             System.out.println("Entered directory: " + dirName);
         } else {
             System.out.println("Directory not found: " + dirName);
@@ -223,16 +202,21 @@ public class SysOpsApp {
     }
 
     private static void goBack() {
-        if (navigationStack.isEmpty()) {
-            System.out.println("Already at root.");
+        if (!navigationStack.isEmpty()) {
+            currentDir = navigationStack.pop();
+            loadDirectory(currentDir);
+            System.out.println("Returned to parent directory.");
             return;
         }
-        // Restore previous state
-        currentDirectoryItems = navigationStack.pop();
-        pathStack.pop();
-        refreshLargestFiles();
 
-        System.out.println("Returned to parent directory.");
+        File parent = currentDir.getParentFile();
+        if (parent != null) {
+            currentDir = parent;
+            loadDirectory(currentDir);
+            System.out.println("Returned to parent directory.");
+        } else {
+            System.out.println("Already at system root.");
+        }
     }
 
     private static void showTopFiles() {
@@ -258,17 +242,25 @@ public class SysOpsApp {
             targetList = currentDirectoryItems;
             System.out.println("Analyzing current directory...");
         } else {
-            // Find the target directory in current view
-            FileSystemItem found = currentDirectoryItems.stream()
-                    .filter(item -> item instanceof DirectoryItem && item.getName().equals(path))
-                    .findFirst()
-                    .orElse(null);
-
-            if (found == null) {
+            File target = new File(currentDir, path);
+            if (!target.exists() || !target.isDirectory()) {
                 System.out.println("Directory not found: " + path);
                 return;
             }
-            targetList = ((DirectoryItem) found).getChildren();
+
+            // Temporarily load target directory
+            targetList = new GenericList<>();
+            File[] files = target.listFiles();
+            if (files != null) {
+                for (File f : files) {
+                    if (f.isDirectory()) {
+                        targetList.add(new DirectoryItem(f.getName(), 0, new Date(f.lastModified())));
+                    } else {
+                        targetList.add(new FileItem(f.getName(), f.length(), new Date(f.lastModified()),
+                                getExtension(f.getName())));
+                    }
+                }
+            }
             System.out.println("Analyzing " + path + "...");
         }
 
