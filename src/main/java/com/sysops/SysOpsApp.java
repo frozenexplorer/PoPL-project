@@ -44,6 +44,8 @@ public class SysOpsApp {
 
             String[] parts = input.split("\\s+");
             String command = parts[0].toLowerCase();
+            // DEBUG: Print received command
+            // System.out.println("DEBUG: Received command: '" + command + "'");
 
             switch (command) {
                 case "ls":
@@ -71,11 +73,47 @@ public class SysOpsApp {
                 case "process":
                     processJob();
                     break;
-                case "history":
-                    showHistory();
+                case "process_all":
+                    processAllJobs();
+                    break;
+                case "avg_size":
+                    showAverageSize();
+                    break;
+                case "counts":
+                    showItemCounts();
+                    break;
+                case "find":
+                    if (parts.length < 2)
+                        System.out.println("Usage: find <name>");
+                    else
+                        findItems(parts[1]);
+                    break;
+                case "size_gt":
+                    if (parts.length < 2)
+                        System.out.println("Usage: size_gt <bytes>");
+                    else
+                        filterBySize(parts[1], true);
+                    break;
+                case "size_lt":
+                    if (parts.length < 2)
+                        System.out.println("Usage: size_lt <bytes>");
+                    else
+                        filterBySize(parts[1], false);
+                    break;
+                case "sort":
+                    if (parts.length < 2)
+                        System.out.println("Usage: sort <name|size>");
+                    else
+                        sortItems(parts[1]);
+                    break;
+                case "max_size":
+                    showMaxSize();
                     break;
                 case "stats":
                     showStats();
+                    break;
+                case "history":
+                    showHistory();
                     break;
                 case "help":
                     printHelp();
@@ -120,6 +158,46 @@ public class SysOpsApp {
         System.out.println("Listing contents:");
         currentDirectoryItems.stream()
                 .forEach(System.out::println);
+    }
+
+    private static void findItems(String query) {
+        System.out.println("Searching for '" + query + "':");
+        currentDirectoryItems.stream()
+                .filter(item -> item.getName().contains(query))
+                .forEach(System.out::println);
+    }
+
+    private static void filterBySize(String sizeStr, boolean greaterThan) {
+        try {
+            long limit = Long.parseLong(sizeStr);
+            String op = greaterThan ? "larger" : "smaller";
+            System.out.println("Files " + op + " than " + limit + " bytes:");
+            currentDirectoryItems.stream()
+                    .filter(item -> greaterThan ? item.getSize() > limit : item.getSize() < limit)
+                    .forEach(System.out::println);
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid size format.");
+        }
+    }
+
+    private static void showMaxSize() {
+        long max = currentDirectoryItems.stream()
+                .mapToLong(FileSystemItem::getSize)
+                .reduce(0, Long::max);
+        System.out.println("Max File Size: " + max + " bytes");
+    }
+
+    private static void sortItems(String criterion) {
+        if (criterion.equals("name")) {
+            currentDirectoryItems.sort(Comparator.comparing(FileSystemItem::getName));
+            System.out.println("Sorted by name.");
+        } else if (criterion.equals("size")) {
+            currentDirectoryItems.sort(Comparator.comparingLong(FileSystemItem::getSize));
+            System.out.println("Sorted by size.");
+        } else {
+            System.out.println("Invalid sort criterion. Use 'name' or 'size'.");
+        }
+        listItems();
     }
 
     private static void changeDirectory(String dirName) {
@@ -175,6 +253,13 @@ public class SysOpsApp {
         }
     }
 
+    private static void processAllJobs() {
+        System.out.println("Processing all jobs...");
+        while (!jobQueue.isEmpty()) {
+            processJob();
+        }
+    }
+
     private static void showHistory() {
         System.out.println("Command History (Last 10):");
         commandHistory.stream().forEach(System.out::println);
@@ -189,14 +274,44 @@ public class SysOpsApp {
         System.out.println("Total Size in current view: " + totalSize + " bytes");
     }
 
+    private static void showAverageSize() {
+        long totalSize = currentDirectoryItems.stream()
+                .mapToLong(FileSystemItem::getSize)
+                .reduce(0, Long::sum);
+        long count = currentDirectoryItems.stream().count();
+        if (count > 0) {
+            System.out.println("Average Size: " + (totalSize / count) + " bytes");
+        } else {
+            System.out.println("Average Size: 0 bytes");
+        }
+    }
+
+    private static void showItemCounts() {
+        long fileCount = currentDirectoryItems.stream()
+                .filter(item -> item instanceof FileItem)
+                .count();
+        long dirCount = currentDirectoryItems.stream()
+                .filter(item -> item instanceof DirectoryItem)
+                .count();
+        System.out.println("Files: " + fileCount + ", Directories: " + dirCount);
+    }
+
     private static void printHelp() {
         System.out.println("Available Commands:");
         System.out.println("  ls / list       - List files");
         System.out.println("  cd <dir>        - Enter directory");
         System.out.println("  back            - Go to previous directory");
         System.out.println("  top             - Show largest file");
+        System.out.println("  find <name>     - Search by name");
+        System.out.println("  size_gt <bytes> - Filter by size (greater than)");
+        System.out.println("  size_lt <bytes> - Filter by size (less than)");
+        System.out.println("  sort <crit>     - Sort by 'name' or 'size'");
         System.out.println("  queue <file>    - Add file to job queue");
         System.out.println("  process         - Process next job");
+        System.out.println("  process_all     - Process all jobs");
+        System.out.println("  avg_size        - Show average file size");
+        System.out.println("  max_size        - Show maximum file size");
+        System.out.println("  counts          - Show count of files and dirs");
         System.out.println("  history         - Show command history");
         System.out.println("  stats           - Show total size");
         System.out.println("  exit            - Quit");

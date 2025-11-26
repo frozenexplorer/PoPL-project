@@ -53,8 +53,16 @@ java -cp bin com.sysops.SysOpsApp
 | `cd <dir>` | Navigate into a subdirectory. |
 | `back` | Return to the previous directory. |
 | `top` | Show the largest file in the current view. |
+| `find <name>` | Search for files/folders by name. |
+| `size_gt <bytes>` | List files larger than the specified size. |
+| `size_lt <bytes>` | List files smaller than the specified size. |
+| `sort <name\|size>` | Sort the current view by name or size. |
 | `queue <file>` | Add a file to the processing job queue. |
 | `process` | Process the next job in the queue. |
+| `process_all` | Process all pending jobs in the queue. |
+| `avg_size` | Calculate average file size. |
+| `max_size` | Show maximum file size. |
+| `counts` | Show count of files vs directories. |
 | `history` | Show the last 10 commands. |
 | `stats` | Display total size of files in the current view. |
 | `exit` | Exit the application. |
