@@ -39,12 +39,28 @@ Each custom container was selected to solve a specific architectural challenge:
 | :--- | :--- | :--- |
 | **`GenericList<T>`** | Main Storage | Supports heterogeneous storage of `FileSystemItem` (files + dirs) with type safety. |
 | **`Stack<T>`** | Navigation | LIFO structure perfectly models directory traversal (breadcrumbs). |
+| **`Queue<T>`** | Job Scheduler | FIFO structure ensures fair ordering for simulated background tasks (Infrastructure ready). |
 | **`Deque<T>`** | History | Double-ended queue allows efficient addition/removal for a fixed-size command history buffer. |
 | **`PriorityQueueCustom<T>`** | Analytics | Min-heap implementation provides $O(1)$ access to the largest files for the `top` command. |
 
 ---
 
 ## 3. Implementation Details
+
+### 3.1. Core Features
+The CLI supports standard operations (`ls`, `cd`, `back`) but enhances them with functional implementations. Directory changes, for instance, use stream filtering to locate targets, ensuring safety and readability.
+
+### 3.2. Advanced Analytics & Aggregation
+To transform the tool from a navigator to an analyzer, we implemented:
+*   **Dynamic Sorting**: `sort <name|size>` uses `Comparator` lambdas to reorder views on the fly.
+*   **Search & Filter**: `find` and `size_gt` utilize stream predicates to narrow down datasets.
+*   **Aggregation**: `avg_size` and `counts` provide statistical summaries using functional reduction, demonstrating the power of the "What, not How" approach.
+
+---
+
+## 4. Development Methodology
+
+The project followed a rapid, iterative development lifecycle over a two-day sprint.
 
 *   **Phase 1: Foundation**: Defined the `FileSystemItem` hierarchy and integrated the `GenericList` and `Stack` containers.
 *   **Phase 2: Core Logic**: Implemented the main REPL loop and navigation commands.
