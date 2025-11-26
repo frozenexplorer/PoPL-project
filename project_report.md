@@ -1,3 +1,4 @@
+
 # SysOps CLI: Project Report
 
 **Course**: Principles of Programming Languages (PoPL) 2025  
@@ -38,95 +39,12 @@ Each custom container was selected to solve a specific architectural challenge:
 | :--- | :--- | :--- |
 | **`GenericList<T>`** | Main Storage | Supports heterogeneous storage of `FileSystemItem` (files + dirs) with type safety. |
 | **`Stack<T>`** | Navigation | LIFO structure perfectly models directory traversal (breadcrumbs). |
-| **`Queue<T>`** | Job Scheduler | FIFO structure ensures fair ordering for simulated background tasks. |
 | **`Deque<T>`** | History | Double-ended queue allows efficient addition/removal for a fixed-size command history buffer. |
 | **`PriorityQueueCustom<T>`** | Analytics | Min-heap implementation provides $O(1)$ access to the largest files for the `top` command. |
 
 ---
 
 ## 3. Implementation Details
-
-### 3.1. Core Features
-The CLI supports standard operations (`ls`, `cd`, `back`) but enhances them with functional implementations. Directory changes, for instance, use stream filtering to locate targets, ensuring safety and readability.
-
-### 3.2. Advanced Analytics & Aggregation
-To transform the tool from a navigator to an analyzer, we implemented:
-*   **Dynamic Sorting**: `sort <name|size>` uses `Comparator` lambdas to reorder views on the fly.
-*   **Search & Filter**: `find` and `size_gt` utilize stream predicates to narrow down datasets.
-*   **Aggregation**: `avg_size` and `counts` provide statistical summaries using functional reduction, demonstrating the power of the "What, not How" approach.
-
----
-
-## 4. Development Methodology
-
-The project followed a rapid, iterative development lifecycle over a two-day sprint.
-
-*   **Phase 1: Foundation**: Defined the `FileSystemItem` hierarchy and integrated the `GenericList` and `Stack` containers.
-*   **Phase 2: Core Logic**: Implemented the main REPL loop and navigation commands.
-*   **Phase 3: Advanced Features**: Added `PriorityQueue` for analytics and `Queue` for job scheduling.
-*   **Phase 4: Refinement**: Refactored imperative loops into functional streams and added aggregation commands.
-# SysOps CLI: Project Report
-
-**Course**: Principles of Programming Languages (PoPL) 2025  
-**Project**: SysOps CLI - Functional-OO File System Analyzer  
-**Date**: November 26, 2025  
-
----
-
-## Executive Summary
-
-The **SysOps CLI** is a robust, command-line interface application designed to simulate and analyze file system operations. Built strictly adhering to the **Functional-Object Oriented (Functional-OO)** paradigm, the system leverages a suite of custom-implemented data structures (`GenericList`, `Stack`, `Queue`, `Deque`, `PriorityQueueCustom`) to manage heterogeneous data, navigation history, job scheduling, and real-time analytics. This report details the architectural decisions, implementation strategies, and the role of Generative AI in accelerating the development process.
-
----
-
-## 1. Introduction
-
-Modern system administration requires tools that are both powerful and predictable. The SysOps CLI was conceived to meet this need by combining the state management capabilities of Object-Oriented Programming (OOP) with the declarative data processing power of Functional Programming.
-
-### Objectives
-*   **Paradigm Compliance**: Strictly enforce Functional-OO principles.
-*   **Custom Infrastructure**: Utilize *only* custom container implementations for all data storage.
-*   **Advanced Analytics**: Provide real-time insights (search, sort, aggregation) without external database dependencies.
-
----
-
-## 2. System Architecture
-
-The architecture is built on a "Separation of Concerns" philosophy, distinguishing clearly between *Data Structure* (OO) and *Data Transformation* (Functional).
-
-### 2.1. The Functional-OO Paradigm
-*   **Object-Oriented State**: The `FileSystemItem` abstract base class provides a polymorphic root for `FileItem` and `DirectoryItem`. This allows the system to treat files and folders uniformly while maintaining their distinct behaviors.
-*   **Functional Processing**: The application logic in `SysOpsApp` avoids mutable state loops. Instead, it uses Java Streams to create declarative pipelines. For example, calculating total size is a reduction operation: `items.stream().mapToLong(getSize).reduce(0, sum)`.
-
-### 2.2. Custom Container Integration
-Each custom container was selected to solve a specific architectural challenge:
-
-| Container | Role | Justification |
-| :--- | :--- | :--- |
-| **`GenericList<T>`** | Main Storage | Supports heterogeneous storage of `FileSystemItem` (files + dirs) with type safety. |
-| **`Stack<T>`** | Navigation | LIFO structure perfectly models directory traversal (breadcrumbs). |
-| **`Queue<T>`** | Job Scheduler | FIFO structure ensures fair ordering for simulated background tasks. |
-| **`Deque<T>`** | History | Double-ended queue allows efficient addition/removal for a fixed-size command history buffer. |
-| **`PriorityQueueCustom<T>`** | Analytics | Min-heap implementation provides $O(1)$ access to the largest files for the `top` command. |
-
----
-
-## 3. Implementation Details
-
-### 3.1. Core Features
-The CLI supports standard operations (`ls`, `cd`, `back`) but enhances them with functional implementations. Directory changes, for instance, use stream filtering to locate targets, ensuring safety and readability.
-
-### 3.2. Advanced Analytics & Aggregation
-To transform the tool from a navigator to an analyzer, we implemented:
-*   **Dynamic Sorting**: `sort <name|size>` uses `Comparator` lambdas to reorder views on the fly.
-*   **Search & Filter**: `find` and `size_gt` utilize stream predicates to narrow down datasets.
-*   **Aggregation**: `avg_size` and `counts` provide statistical summaries using functional reduction, demonstrating the power of the "What, not How" approach.
-
----
-
-## 4. Development Methodology
-
-The project followed a rapid, iterative development lifecycle over a two-day sprint.
 
 *   **Phase 1: Foundation**: Defined the `FileSystemItem` hierarchy and integrated the `GenericList` and `Stack` containers.
 *   **Phase 2: Core Logic**: Implemented the main REPL loop and navigation commands.
@@ -162,10 +80,10 @@ To accelerate development while maintaining strict architectural control, Genera
 > **Prompt**: "The current sorting implementation for finding the largest file is $O(n \log n)$. Propose a heap-based solution using a custom `Comparator` and `PriorityQueue` to maintain only the top $K$ largest files. I need $O(1)$ access time for the largest element."
 *   **Outcome**: This drove the decision to use `PriorityQueueCustom` for the `top` command, significantly optimizing performance for large directories compared to a full sort.
 
-### 5.5. Phase 5: Aggregation & Final Polish
-**Goal**: Add statistical insights and ensure professional documentation.
-> **Prompt**: "I need to add aggregation commands to the CLI. Suggest implementation logic for `avg_size` and `counts` (file vs dir) using Java Streams. Also, help me structure a formal project report that covers the architecture, implementation details, and this prompt engineering strategy."
-*   **Outcome**: Implemented `avg_size` and `counts` using stream reductions and filters. The project report was structured to professionally document the entire engineering process.
+### 5.5. Phase 5: Refactoring & Final Polish
+**Goal**: Enhance realism with nested navigation and consolidate analytics.
+> **Prompt**: "Refactor the CLI to support real nested directory navigation instead of just simulating it. Also, consolidate the `avg_size`, `max_size`, and `counts` commands into a single `analyse [path]` command that provides a comprehensive report for any directory. Remove the `queue` system to streamline the focus on analysis."
+*   **Outcome**: Modified `DirectoryItem` to hold children, enabling true recursive navigation. Replaced individual stats commands with a robust `analyse` tool, and removed the job queue to focus on the core file system analysis value proposition.
 
 
 ---
