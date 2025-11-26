@@ -6,33 +6,38 @@ import java.util.Date;
 import java.util.Comparator;
 
 public class SysOpsApp {
-    // 1. Heterogeneous List: Stores both Files and Directories
+    // 1. Heterogeneous List: Stores current view
     private static GenericList<FileSystemItem> currentDirectoryItems = new GenericList<>();
 
-    // 2. Stack: Navigation History (Breadcrumbs)
-    private static Stack<DirectoryItem> navigationStack = new Stack<>();
+    // 2. Stack: Navigation History (Stores the LIST of items of the parent
+    // directory)
+    // Actually, to support "real" navigation, we should store the DirectoryItem
+    // itself
+    // so we can go back to its parent? Or just store the previous list?
+    // Let's store the previous list for simplicity in restoring the view.
+    private static Stack<GenericList<FileSystemItem>> navigationStack = new Stack<>();
 
-    // 3. Queue: Job Processing Queue
-    private static Queue<String> jobQueue = new Queue<>();
+    // Track current path name for display
+    private static Stack<String> pathStack = new Stack<>();
 
-    // 4. Deque: Command History
+    // 3. Deque: Command History
     private static Deque<String> commandHistory = new Deque<>();
 
-    // 5. PriorityQueue: Top Largest Files
-    // Custom Comparator for PriorityQueue (Max Heap based on size)
+    // 4. PriorityQueue: Top Largest Files (Maintained for current view)
     private static PriorityQueueCustom<FileItem> largestFiles = new PriorityQueueCustom<>(
             (f1, f2) -> Long.compare(f2.getSize(), f1.getSize()));
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Welcome to SysOps CLI v1.0");
+        System.out.println("Welcome to SysOps CLI v2.0");
         System.out.println("Type 'help' for commands.");
 
-        // Initialize with some dummy data
+        // Initialize with nested data
         loadDummyData();
+        pathStack.push("/");
 
         while (true) {
-            System.out.print("\n> ");
+            System.out.print("\n" + getPathString() + "> ");
             String input = scanner.nextLine().trim();
             if (input.isEmpty())
                 continue;
@@ -44,8 +49,6 @@ public class SysOpsApp {
 
             String[] parts = input.split("\\s+");
             String command = parts[0].toLowerCase();
-            // DEBUG: Print received command
-            // System.out.println("DEBUG: Received command: '" + command + "'");
 
             switch (command) {
                 case "ls":
@@ -63,24 +66,6 @@ public class SysOpsApp {
                     break;
                 case "top":
                     showTopFiles();
-                    break;
-                case "queue":
-                    if (parts.length < 2)
-                        System.out.println("Usage: queue <filename>");
-                    else
-                        queueJob(parts[1]);
-                    break;
-                case "process":
-                    processJob();
-                    break;
-                case "process_all":
-                    processAllJobs();
-                    break;
-                case "avg_size":
-                    showAverageSize();
-                    break;
-                case "counts":
-                    showItemCounts();
                     break;
                 case "find":
                     if (parts.length < 2)
@@ -106,11 +91,12 @@ public class SysOpsApp {
                     else
                         sortItems(parts[1]);
                     break;
-                case "max_size":
-                    showMaxSize();
-                    break;
-                case "stats":
-                    showStats();
+                case "analyse":
+                case "analyze":
+                    if (parts.length < 2)
+                        analyzePath(null); // Analyze current
+                    else
+                        analyzePath(parts[1]); // Analyze target
                     break;
                 case "history":
                     showHistory();
@@ -127,30 +113,49 @@ public class SysOpsApp {
         }
     }
 
+    private static String getPathString() {
+        // Reconstruct path from stack (this is a bit hacky with Stack but works for
+        // display)
+        // Since our Stack is LIFO, we can't easily iterate bottom-up without popping.
+        // For simplicity, we'll just show the top.
+        if (pathStack.isEmpty())
+            return "/";
+        return pathStack.peek();
+    }
+
     private static void loadDummyData() {
         currentDirectoryItems = new GenericList<>();
         largestFiles = new PriorityQueueCustom<>((f1, f2) -> Long.compare(f2.getSize(), f1.getSize()));
 
-        // Add heterogeneous items
+        // Root items
         FileItem f1 = new FileItem("report.pdf", 10240, new Date(), "pdf");
         FileItem f2 = new FileItem("image.png", 5120, new Date(), "png");
-        FileItem f3 = new FileItem("notes.txt", 120, new Date(), "txt");
-        FileItem f4 = new FileItem("video.mp4", 500000, new Date(), "mp4");
-        DirectoryItem d1 = new DirectoryItem("documents", 0, new Date(), 5);
-        DirectoryItem d2 = new DirectoryItem("photos", 0, new Date(), 10);
+
+        DirectoryItem d1 = new DirectoryItem("documents", 0, new Date());
+        DirectoryItem d2 = new DirectoryItem("photos", 0, new Date());
+
+        // Populate documents
+        d1.addChild(new FileItem("resume.docx", 2048, new Date(), "docx"));
+        d1.addChild(new FileItem("budget.xlsx", 4096, new Date(), "xlsx"));
+
+        // Populate photos
+        d2.addChild(new FileItem("vacation.jpg", 200000, new Date(), "jpg"));
+        d2.addChild(new FileItem("profile.jpg", 50000, new Date(), "jpg"));
 
         currentDirectoryItems.add(f1);
         currentDirectoryItems.add(f2);
-        currentDirectoryItems.add(f3);
-        currentDirectoryItems.add(f4);
         currentDirectoryItems.add(d1);
         currentDirectoryItems.add(d2);
 
-        // Populate PriorityQueue with files only
-        largestFiles.add(f1);
-        largestFiles.add(f2);
-        largestFiles.add(f3);
-        largestFiles.add(f4);
+        refreshLargestFiles();
+    }
+
+    private static void refreshLargestFiles() {
+        largestFiles = new PriorityQueueCustom<>((f1, f2) -> Long.compare(f2.getSize(), f1.getSize()));
+        currentDirectoryItems.stream()
+                .filter(item -> item instanceof FileItem)
+                .map(item -> (FileItem) item)
+                .forEach(largestFiles::add);
     }
 
     // Functional-OO: Using Streams (lambdas) for display
@@ -180,13 +185,6 @@ public class SysOpsApp {
         }
     }
 
-    private static void showMaxSize() {
-        long max = currentDirectoryItems.stream()
-                .mapToLong(FileSystemItem::getSize)
-                .reduce(0, Long::max);
-        System.out.println("Max File Size: " + max + " bytes");
-    }
-
     private static void sortItems(String criterion) {
         if (criterion.equals("name")) {
             currentDirectoryItems.sort(Comparator.comparing(FileSystemItem::getName));
@@ -208,11 +206,17 @@ public class SysOpsApp {
                 .orElse(null);
 
         if (found != null) {
-            navigationStack.push((DirectoryItem) found);
+            DirectoryItem dir = (DirectoryItem) found;
+
+            // Save current state
+            navigationStack.push(currentDirectoryItems);
+            pathStack.push(dirName);
+
+            // Switch to new state
+            currentDirectoryItems = dir.getChildren();
+            refreshLargestFiles();
+
             System.out.println("Entered directory: " + dirName);
-            // In a real app, we would load new items here.
-            // For demo, we just clear and reload dummy data to simulate change.
-            loadDummyData();
         } else {
             System.out.println("Directory not found: " + dirName);
         }
@@ -223,14 +227,16 @@ public class SysOpsApp {
             System.out.println("Already at root.");
             return;
         }
-        DirectoryItem prev = navigationStack.pop();
-        System.out.println("Returned from " + prev.getName());
+        // Restore previous state
+        currentDirectoryItems = navigationStack.pop();
+        pathStack.pop();
+        refreshLargestFiles();
+
+        System.out.println("Returned to parent directory.");
     }
 
     private static void showTopFiles() {
         System.out.println("Top Largest Files (PriorityQueue):");
-        // Peek doesn't remove, but to show all we might need to iterate or just show
-        // top 1
         FileItem top = largestFiles.peek();
         if (top != null) {
             System.out.println("Largest: " + top);
@@ -239,61 +245,52 @@ public class SysOpsApp {
         }
     }
 
-    private static void queueJob(String filename) {
-        jobQueue.enqueue(filename);
-        System.out.println("Added " + filename + " to processing queue.");
-    }
-
-    private static void processJob() {
-        String job = jobQueue.dequeue();
-        if (job != null) {
-            System.out.println("Processing " + job + "... Done.");
-        } else {
-            System.out.println("Queue is empty.");
-        }
-    }
-
-    private static void processAllJobs() {
-        System.out.println("Processing all jobs...");
-        while (!jobQueue.isEmpty()) {
-            processJob();
-        }
-    }
-
     private static void showHistory() {
         System.out.println("Command History (Last 10):");
         commandHistory.stream().forEach(System.out::println);
     }
 
-    // Functional-OO: Aggregation using reduce
-    private static void showStats() {
-        long totalSize = currentDirectoryItems.stream()
-                .mapToLong(FileSystemItem::getSize)
-                .reduce(0, Long::sum);
+    // Consolidated Analysis Command
+    private static void analyzePath(String path) {
+        GenericList<FileSystemItem> targetList;
 
-        System.out.println("Total Size in current view: " + totalSize + " bytes");
-    }
-
-    private static void showAverageSize() {
-        long totalSize = currentDirectoryItems.stream()
-                .mapToLong(FileSystemItem::getSize)
-                .reduce(0, Long::sum);
-        long count = currentDirectoryItems.stream().count();
-        if (count > 0) {
-            System.out.println("Average Size: " + (totalSize / count) + " bytes");
+        if (path == null) {
+            targetList = currentDirectoryItems;
+            System.out.println("Analyzing current directory...");
         } else {
-            System.out.println("Average Size: 0 bytes");
-        }
-    }
+            // Find the target directory in current view
+            FileSystemItem found = currentDirectoryItems.stream()
+                    .filter(item -> item instanceof DirectoryItem && item.getName().equals(path))
+                    .findFirst()
+                    .orElse(null);
 
-    private static void showItemCounts() {
-        long fileCount = currentDirectoryItems.stream()
-                .filter(item -> item instanceof FileItem)
-                .count();
-        long dirCount = currentDirectoryItems.stream()
-                .filter(item -> item instanceof DirectoryItem)
-                .count();
-        System.out.println("Files: " + fileCount + ", Directories: " + dirCount);
+            if (found == null) {
+                System.out.println("Directory not found: " + path);
+                return;
+            }
+            targetList = ((DirectoryItem) found).getChildren();
+            System.out.println("Analyzing " + path + "...");
+        }
+
+        // 1. Counts
+        long fileCount = targetList.stream().filter(item -> item instanceof FileItem).count();
+        long dirCount = targetList.stream().filter(item -> item instanceof DirectoryItem).count();
+
+        // 2. Avg Size
+        long totalSize = targetList.stream().mapToLong(FileSystemItem::getSize).reduce(0, Long::sum);
+        long totalCount = targetList.stream().count();
+        double avgSize = totalCount > 0 ? (double) totalSize / totalCount : 0.0;
+
+        // 3. Max Size
+        long maxSize = targetList.stream().mapToLong(FileSystemItem::getSize).reduce(0, Long::max);
+
+        System.out.println("--- Analysis Report ---");
+        System.out.println("Files: " + fileCount);
+        System.out.println("Directories: " + dirCount);
+        System.out.println("Total Size: " + totalSize + " bytes");
+        System.out.printf("Average Size: %.2f bytes%n", avgSize);
+        System.out.println("Max File Size: " + maxSize + " bytes");
+        System.out.println("-----------------------");
     }
 
     private static void printHelp() {
@@ -306,14 +303,8 @@ public class SysOpsApp {
         System.out.println("  size_gt <bytes> - Filter by size (greater than)");
         System.out.println("  size_lt <bytes> - Filter by size (less than)");
         System.out.println("  sort <crit>     - Sort by 'name' or 'size'");
-        System.out.println("  queue <file>    - Add file to job queue");
-        System.out.println("  process         - Process next job");
-        System.out.println("  process_all     - Process all jobs");
-        System.out.println("  avg_size        - Show average file size");
-        System.out.println("  max_size        - Show maximum file size");
-        System.out.println("  counts          - Show count of files and dirs");
+        System.out.println("  analyse [path]  - Show statistics (Counts, Avg, Max)");
         System.out.println("  history         - Show command history");
-        System.out.println("  stats           - Show total size");
         System.out.println("  exit            - Quit");
     }
 }
