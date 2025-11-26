@@ -1,0 +1,10 @@
+ls
+top
+cd documents
+ls
+back
+queue report.pdf
+process
+history
+stats
+exit
